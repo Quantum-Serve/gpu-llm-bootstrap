@@ -75,6 +75,21 @@ ollama serve >/workspace/ollama.log 2>&1 &
 for i in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break || sleep 5; done
 ollama list | grep -qF "$MODEL" || for i in $(seq 1 20); do ollama pull "$MODEL" && ollama list | grep -qF "$MODEL" && break; sleep 15; done
 
+# --- periodic keymap refresh: re-fetch the secret every 60s and reload nginx on change (matches the old box's
+# apply-llm-config timer, so newly added/revoked customer keys go live within ~60s — no restart needed) ---
+if [ -n "$AWS_ACCESS_KEY_ID" ]; then
+	(
+		while true; do
+			sleep 60
+			aws secretsmanager get-secret-value --secret-id quantumserve-gpu-llm-client-keys --region "${AWS_REGION:-us-east-1}" --query SecretString --output text 2>/dev/null \
+				| jq -r '("\"dev:Bearer \(.dev)\" 1;"), (.customers | to_entries[] | "\"\(.key):Bearer \(.value)\" 1;")' > /tmp/keys.new 2>/dev/null
+			if [ -s /tmp/keys.new ] && ! cmp -s /tmp/keys.new /workspace/llm-keys.map; then
+				mv /tmp/keys.new /workspace/llm-keys.map && nginx -s reload
+			fi
+		done
+	) &
+fi
+
 # --- warm the model into VRAM in the background ---
 (
 	for i in $(seq 1 60); do curl -sf http://127.0.0.1:11434/api/tags >/dev/null && break || sleep 5; done
