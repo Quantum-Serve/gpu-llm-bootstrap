@@ -23,7 +23,7 @@ mkdir -p "$OLLAMA_MODELS" /workspace/ollama-dist /var/run/tailscale /workspace/t
 
 # --- deps: nginx + curl + tailscale (small; installed each boot) ---
 apt-get update -qq
-apt-get install -y -qq --no-install-recommends nginx curl ca-certificates >/dev/null 2>&1
+apt-get install -y -qq --no-install-recommends nginx curl ca-certificates zstd tar >/dev/null 2>&1
 command -v tailscale >/dev/null 2>&1 || curl -fsSL https://tailscale.com/install.sh | sh
 
 # --- Ollama: install via the official script (lands in /usr/local/bin, on PATH). Reinstalls each boot (~1 min on RunPod's
