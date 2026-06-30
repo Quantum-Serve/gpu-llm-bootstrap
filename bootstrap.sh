@@ -53,7 +53,15 @@ server {
 NGINX
 rm -f /etc/nginx/sites-enabled/default
 sed -i 's/ default_server//g' /etc/nginx/nginx.conf 2>/dev/null || true
-touch /workspace/llm-keys.map
+# Keymap: if scoped AWS creds are present (env), fetch the caller keys from Secrets Manager and build the nginx map
+# (same dev + per-customer format as the old AWS box). Otherwise leave it empty (gate denies all until populated).
+if [ -n "$AWS_ACCESS_KEY_ID" ]; then
+	apt-get install -y -qq --no-install-recommends awscli jq >/dev/null 2>&1
+	aws secretsmanager get-secret-value --secret-id quantumserve-gpu-llm-client-keys --region "${AWS_REGION:-us-east-1}" --query SecretString --output text \
+		| jq -r '("\"dev:Bearer \(.dev)\" 1;"), (.customers | to_entries[] | "\"\(.key):Bearer \(.value)\" 1;")' > /workspace/llm-keys.map || touch /workspace/llm-keys.map
+else
+	touch /workspace/llm-keys.map
+fi
 ln -sf /workspace/llm-keys.map /etc/nginx/llm-keys.map
 
 # --- Tailscale (userspace networking; tagged so it never expires; HTTP-mode serve exposes the gate over the tailnet auto-cert) ---
