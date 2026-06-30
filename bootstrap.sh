@@ -26,12 +26,9 @@ apt-get update -qq
 apt-get install -y -qq --no-install-recommends nginx curl ca-certificates >/dev/null 2>&1
 command -v tailscale >/dev/null 2>&1 || curl -fsSL https://tailscale.com/install.sh | sh
 
-# --- Ollama: persisted on the volume so only the first boot downloads it ---
-if [ ! -x /workspace/ollama-dist/bin/ollama ]; then
-	curl -fsSL https://ollama.com/download/ollama-linux-amd64.tgz -o /tmp/ollama.tgz
-	tar -xzf /tmp/ollama.tgz -C /workspace/ollama-dist
-fi
-export PATH=/workspace/ollama-dist/bin:$PATH
+# --- Ollama: install via the official script (lands in /usr/local/bin, on PATH). Reinstalls each boot (~1 min on RunPod's
+# pipe); the model itself persists on the volume so it never re-downloads. (The .tgz direct-download path 404s.) ---
+command -v ollama >/dev/null 2>&1 || curl -fsSL https://ollama.com/install.sh | sh
 
 # --- nginx token gate (Host rewritten to localhost so Ollama's anti-DNS-rebinding check doesn't 403 proxied requests) ---
 cat > /etc/nginx/conf.d/llm.conf <<'NGINX'
